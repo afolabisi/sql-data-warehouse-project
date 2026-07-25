@@ -1,0 +1,82 @@
+/*
+===============================================================================
+Quality Checks — Gold Layer
+===============================================================================
+Script Purpose:
+    This script validates the Gold layer views after they've been created.
+    Unlike Bronze/Silver checks (which catch dirty source data), Gold layer
+    checks focus on:
+        - Surrogate key uniqueness in each dimension
+        - Join integrity between the fact table and its dimensions
+          (i.e. did any LEFT JOIN fail to match, producing unexpected NULLs)
+        - Basic row-count sanity between Silver and Gold
+
+    Run these after (re)creating the Gold views to confirm the star schema
+    is behaving as expected.
+===============================================================================
+*/
+
+-- ===========================================================================
+-- Gold.dim_customers
+-- ===========================================================================
+
+-- Check that customer_key (surrogate key) is unique
+SELECT customer_key, COUNT(*) AS total
+FROM Gold.dim_customers
+GROUP BY customer_key
+HAVING COUNT(*) > 1;
+
+-- Check that customer_id (natural/business key) is unique
+SELECT customer_id, COUNT(*) AS total
+FROM Gold.dim_customers
+GROUP BY customer_id
+HAVING COUNT(*) > 1;
+
+-- Preview the dimension
+SELECT * FROM Gold.dim_customers;
+
+
+-- ===========================================================================
+-- Gold.dim_products
+-- ===========================================================================
+
+-- Check that product_key (surrogate key) is unique
+SELECT product_key, COUNT(*) AS total
+FROM Gold.dim_products
+GROUP BY product_key
+HAVING COUNT(*) > 1;
+
+-- Check that product_number (natural/business key) is unique
+SELECT product_number, COUNT(*) AS total
+FROM Gold.dim_products
+GROUP BY product_number
+HAVING COUNT(*) > 1;
+
+-- Preview the dimension
+SELECT * FROM Gold.dim_products;
+
+
+-- ===========================================================================
+-- Gold.fact_sales
+-- ===========================================================================
+
+-- Check for sales rows where the product join failed to match
+-- (sls_prd_key in Silver has no corresponding product_number in Gold.dim_products)
+SELECT *
+FROM Gold.fact_sales
+WHERE product_key IS NULL;
+
+-- Check for sales rows where the customer join failed to match
+-- (sls_cusID in Silver has no corresponding customer_id in Gold.dim_customers)
+SELECT *
+FROM Gold.fact_sales
+WHERE customer_key IS NULL;
+
+-- Sanity check: row count in fact_sales should match Silver.crm_sales_details
+-- (a mismatch here would suggest a join fan-out/duplication issue)
+SELECT
+    (SELECT COUNT(*) FROM Silver.crm_sales_details) AS silver_row_count,
+    (SELECT COUNT(*) FROM Gold.fact_sales)           AS gold_row_count;
+
+-- Preview the fact table
+SELECT * FROM Gold.fact_sales;
