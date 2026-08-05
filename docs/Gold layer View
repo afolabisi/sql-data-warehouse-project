@@ -1,0 +1,49 @@
+IF OBJECT_ID('Gold.dim_customers', 'V') IS NOT NULL
+    DROP VIEW Gold.dim_customers;
+GO
+
+CREATE VIEW Gold.dim_customers AS
+SELECT
+    ROW_NUMBER() OVER (ORDER BY ci.cst_id) AS customer_key,   -- surrogate key
+    ci.cst_id                              AS customer_id,
+    ci.cst_key                              AS customer_number,
+    ci.cst_firstname                        AS firstname,
+    ci.cst_lastname                         AS lastname,
+    lo.cntry                                AS country,
+    ci.cst_marital_status                   AS marital_status,
+    -- Prefer CRM gender; fall back to ERP gender only when CRM value is unknown
+    CASE WHEN ci.cst_gndr != 'UNKNOWN' THEN ci.cst_gndr
+         ELSE COALESCE(er.gen, 'UNKNOWN')
+    END                                      AS gender,
+    er.bdate                                 AS birthday,
+    ci.cst_created_date                      AS created_date
+FROM Silver.crm_cus_info ci
+LEFT JOIN Silver.erp_cust_az12 er ON ci.cst_key = er.cid
+LEFT JOIN Silver.erp_loc_a101 lo  ON ci.cst_key = lo.cid;
+GO
+
+
+-- ===========================================================================
+-- Gold.dim_products
+-- ===========================================================================
+IF OBJECT_ID('Gold.dim_products', 'V') IS NOT NULL
+    DROP VIEW Gold.dim_products;
+GO
+
+CREATE VIEW Gold.dim_products AS
+SELECT
+    ROW_NUMBER() OVER (ORDER BY pr.prd_start_dt, pr.prd_key) AS product_key, -- surrogate key
+    pr.prd_id                                                 AS product_id,
+    pr.prd_key                                                AS product_number,
+    pr.prd_name                                                AS product_name,
+    pr.cat_id                                                  AS category_id,
+    pn.cat                                                     AS category,
+    pn.subcat                                                  AS subcategory,
+    pn.maintenance,
+    pr.prd_cost                                                AS cost,
+    pr.prd_line                                                AS product_line,
+    pr.prd_start_dt                                            AS start_date
+FROM Silver.crm_prd_info pr
+LEFT JOIN Silver.erp_px_cat_giv2 pn ON pr.cat_id = pn.id
+WHERE pr.prd_end_dt IS NULL; -- keep only the current version of each product, filter out historical records
+GO
