@@ -1,106 +1,187 @@
 # SQL Data Warehouse Project
 
-A SQL Server data warehouse built using the **Medallion Architecture**
-(Bronze → Silver → Gold), consolidating CRM and ERP source data into a
-clean, analysis-ready star schema.
+## Overview
 
-## 🏗️ Architecture
+This project demonstrates the design and implementation of a modern SQL data warehouse using the Bronze, Silver, and Gold architecture.
 
-![Architecture Diagram](docs/architecture_diagram.png)
+The project covers the complete ETL process, from loading raw data into the warehouse to transforming it into business-ready reports and analytical views.
 
-- **Bronze**: Raw ingestion from source CSVs, no transformation. Serves as
-  an auditable copy of the original data.
-- **Silver**: Cleaned and conformed data — deduplication, trimming, type
-  correction, standardized categorical values, and business-rule validation
-  (e.g. `sales = quantity * price`).
-- **Gold**: A star schema exposed as views — `dim_customers`, `dim_product`,
-  and `fact_sales` — built for reporting and analysis.
+---
 
-## 🗂️ Source Systems
+## Project Architecture
 
-![Source Systems Diagram](docs/source_systems_diagram.png)
+The warehouse follows a three-layer architecture:
 
-| System | Table | Description |
-|--------|-------|-------------|
-| CRM | `crm_sales_details` | Transactional records about sales & orders |
-| CRM | `crm_prd_info` | Current & historical product information |
-| CRM | `crm_cust_info` | Customer information |
-| ERP | `erp_cust_az12` | Extra customer information |
-| ERP | `erp_loc_a101` | Location of customers (country) |
-| ERP | `erp_px_cat_giv2` | Product categories |
+- Bronze Layer: Stores raw data imported from source systems.
+- Silver Layer: Cleans, validates, and transforms the raw data.
+- Gold Layer: Contains business-ready views and reports for analytics.
 
-## ⭐ Gold Layer Data Model
+### Architecture Diagram
 
-![Gold Layer ERD](docs/gold_layer_erd.png)
+![Architecture](docs/Architecture_Diagram.jpg)
 
-The Gold layer follows a star schema: `Gold.fact_sales` sits at the center,
-linked to `Gold.dim_customers` and `Gold.dim_product` via surrogate keys
-(`customer_key`, `product_key`). The core business rule enforced in Silver
-and reflected here is:
+---
 
-```
-Sales = Quantity * Price
-```
+## Repository Structure
 
-## 📂 Repository Structure
+```text
+sql-data-warehouse-project/
 
-```
+├── datasets/
+│
 ├── docs/
-│   ├── architecture_diagram.png       -- Bronze/Silver/Gold flow
-│   ├── source_systems_diagram.png     -- CRM/ERP table relationships
-│   └── gold_layer_erd.png             -- Gold layer star schema
-├── scripts/
-│   ├── init_database.sql              -- Creates DB, schemas, and Bronze/Silver tables
-│   ├── load_bronze.sql                -- Bronze.load_bronze stored procedure
-│   ├── load_silver.sql                -- Silver.load_silver stored procedure
-│   └── gold_layer.sql                 -- Gold layer views (star schema)
-├── tests/
-│   ├── quality_checks_bronze_to_silver.sql  -- Data profiling & validation queries
-│   └── quality_checks_gold.sql              -- Star schema integrity checks
+│   ├── Architecture_Diagram.jpg
+│   ├── Source_System_Diagram.jpg
+│   ├── Bronze Table
+│   ├── Silver Table Load
+│   ├── Gold Layer View
+│   └── Data Cleansing
+│
+├── script/
+│   ├── Bronze/
+│   │   ├── ddl_script.sql
+│   │   └── proc.load_bronze.sql
+│   │
+│   ├── Silver/
+│   │   ├── ddl_silver.sql
+│   │   ├── proc.load_silver.sql
+│   │   └── init_database.sql
+│   │
+│   └── Gold/
+│       ├── ddl_scripts.sql
+│       ├── Customer_Report.sql
+│       └── Product_Report.sql
+│
+├── Tests/
+│   ├── quality_checks_silver.sql
+│   └── quality_checks_gold.sql
+│
 └── README.md
 ```
 
-## 🚀 How to Run
+---
 
-1. Run `scripts/init_database.sql` to create the database, schemas, and tables.
-2. Update the file paths in `scripts/load_bronze.sql` to match your local CSV
-   source locations.
-3. Execute the stored procedures in order:
-   ```sql
-   EXEC Bronze.load_bronze;
-   EXEC Silver.load_silver;
-   ```
-4. Run `scripts/gold_layer.sql` to create the Gold layer views.
-5. Query the Gold layer for analysis:
-   ```sql
-   SELECT * FROM Gold.fact_sales;
-   ```
+# Data Warehouse Layers
 
-## ✅ Data Quality Approach
+## Bronze Layer
 
-Before writing transformation logic, the Bronze layer was profiled for:
-- Duplicate/null primary keys
-- Unwanted whitespace
-- Inconsistent categorical values (abbreviations, typos)
-- Invalid or out-of-range dates
-- Referential mismatches between related tables
-- Business rule violations (e.g. Sales ≠ Quantity × Price)
+The Bronze layer stores raw data exactly as received from source systems.
 
-The queries used for this are documented in
-`tests/quality_checks_bronze_to_silver.sql` and `tests/quality_checks_gold.sql`,
-showing the reasoning behind each cleaning rule applied in the Silver layer.
+### Tasks
 
-## 🛠️ Notes / Design Decisions
+- Import CSV files
+- Preserve original data
+- Create staging tables
+- Load raw records
 
-- Gold layer dimension/fact tables are implemented as **views**, not
-  materialized tables, so they always reflect the latest Silver data.
-- `fact_sales` uses `LEFT JOIN`s to its dimensions — a sale with no matching
-  product or customer key still appears in the fact table (with a `NULL`
-  key) rather than being silently dropped. This is a deliberate choice to
-  avoid losing transactional data.
-- Surrogate keys (`customer_key`, `product_key`) are generated with
-  `ROW_NUMBER()` since the source systems only provide natural/business keys.
+---
 
-## 📄 License
+## Silver Layer
 
-MIT — feel free to reuse and adapt.
+The Silver layer focuses on data cleaning and transformation.
+
+### Tasks
+
+- Remove duplicates
+- Standardize formats
+- Handle null values
+- Clean customer and product data
+- Apply business rules
+
+---
+
+## Gold Layer
+
+The Gold layer contains analytical views optimized for reporting.
+
+### Reports
+
+#### Customer Report
+
+Provides customer insights, including:
+
+- Customer segmentation
+- Total orders
+- Total sales
+- Total quantity purchased
+- Customer lifespan
+- Average order value
+- Average monthly spending
+- Customer recency
+
+#### Product Report
+
+Provides product insights, including:
+
+- Product segmentation
+- Total sales
+- Total quantity sold
+- Total customers
+- Product lifespan
+- Average selling price
+- Average order revenue
+- Average monthly revenue
+
+---
+
+# ETL Workflow
+
+1. Extract data from source systems.
+2. Load raw data into Bronze tables.
+3. Clean and transform data in Silver tables.
+4. Build analytical views in Gold.
+5. Validate data quality using test scripts.
+
+---
+
+# Data Quality Checks
+
+The project includes validation scripts to ensure:
+
+- No duplicate records
+- No missing keys
+- Correct relationships
+- Data consistency
+- Accurate business calculations
+
+---
+
+# Technologies Used
+
+- SQL Server
+- T-SQL
+- SSMS
+- ETL
+- Data Warehouse Modeling
+- Git
+- GitHub
+
+---
+
+# Documentation
+
+Additional documentation is available in the `docs` folder:
+
+- Architecture diagrams
+- Source system diagrams
+- Data cleansing process
+- Table structures
+- Gold-layer views
+
+---
+
+# Future Improvements
+
+- Power BI dashboard integration
+- Incremental loading
+- SQL Agent automation
+- Performance optimization
+- Index tuning
+
+---
+
+# Author
+
+**Afolabi Sunday**
+
+Aspiring Data Analyst and future Data Scientist passionate about SQL, data engineering, and analytics.
